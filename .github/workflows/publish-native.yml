@@ -1,0 +1,41 @@
+# Installed as .github/workflows/publish-native.yml in the PUBLIC exports repo.
+name: Publish native playtest
+
+on:
+  push:
+    branches: ['native-delivery/*']
+  workflow_dispatch:
+    inputs:
+      delivery_branch:
+        description: Existing native-delivery/<run-id>-<attempt> branch to retry
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'brianwigfield/tower-defense-playtest'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # Execute publisher code ONLY from the public default branch, never delivery.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate delivery, publish complete release, and remove delivery ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DELIVERY_BRANCH: ${{ inputs.delivery_branch || github.ref_name }}
+        run: python .github/publish_native.py
