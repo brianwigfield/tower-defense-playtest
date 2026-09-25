@@ -122,11 +122,14 @@ def publish(manifest, output):
         f"Source revision: `{manifest['source_sha']}`\n\n"
         f"<!-- native-sequence: {sequence[0]}-{sequence[1]} -->\n", encoding="utf-8")
     if not existing:
-        command("gh", "release", "create", tag, "--repo", REPO, "--target", "main",
-                "--draft", "--title", "Latest playtest", "--notes-file", str(notes))
+        existing = json.loads(command(
+            "gh", "api", "--method", "POST", f"repos/{REPO}/releases",
+            "-f", f"tag_name={tag}", "-f", "target_commitish=main",
+            "-F", "draft=true", "-f", "name=Latest playtest",
+            "-f", f"body={notes.read_text(encoding='utf-8')}"))
     command("gh", "release", "upload", tag, "--repo", REPO, "--clobber",
             *(str(output / name) for name in (*NAMES, "SHA256SUMS")))
-    release = json.loads(command("gh", "api", f"repos/{REPO}/releases/tags/{tag}"))
+    release = json.loads(command("gh", "api", f"repos/{REPO}/releases/{existing['id']}"))
     expected = {name: (output / name).stat().st_size for name in (*NAMES, "SHA256SUMS")}
     require({asset["name"]: asset["size"] for asset in release["assets"]} == expected,
             "Uploaded release assets do not match the complete package set")
